@@ -8323,6 +8323,7 @@ connect_socket(struct mg_context *ctx /* may be NULL */,
 		            "SSL is not initialized");
 		return 0;
 	}
+#endif
 
 #endif /* OPENSSL_API_1_1 */
 #else
