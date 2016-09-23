@@ -65,6 +65,10 @@ find_package(LibRt)
 if (LIBRT_FOUND)
   set(CHECK_LIBRARIES "${CHECK_LIBRARIES};LIBRT::LIBRT")
 endif()
+find_package(LibSubunit)
+if (LIBSUBUNIT_FOUND)
+  set(CHECK_LIBRARIES "${CHECK_LIBRARIES};LIBSUBUNIT::LIBSUBUNIT")
+endif()
 
 # Build the C unit tests
 add_library(shared-c-unit-tests STATIC shared.c)
