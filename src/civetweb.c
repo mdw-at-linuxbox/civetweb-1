@@ -2189,6 +2189,8 @@ enum {
 #endif
 	ADDITIONAL_HEADER,
 	ALLOW_INDEX_SCRIPT_SUB_RES,
+	VALIDATE_HTTP_METHOD,
+	CANONICALIZE_URL_PATH,
 
 	NUM_OPTIONS
 };
@@ -2298,6 +2300,8 @@ static struct mg_option config_options[] = {
     {"allow_index_script_resource", MG_CONFIG_TYPE_BOOLEAN, "no"},
 
     {NULL, MG_CONFIG_TYPE_UNKNOWN, NULL}};
+    {"validate_http_method", CONFIG_TYPE_BOOLEAN, "yes"},
+    {"canonicalize_url_path", CONFIG_TYPE_BOOLEAN, "yes"},
 
 
 /* Check if the config_options and the corresponding enum have compatible
@@ -3445,6 +3449,11 @@ mg_cry_internal_impl(const struct mg_connection *conn,
 	}
 }
 
+void
+mg_set_http_status(struct mg_connection *conn, int status)
+{
+	conn->status_code = status;
+}
 
 static void
 mg_cry_internal_wrap(const struct mg_connection *conn,
@@ -3974,6 +3983,16 @@ should_decode_url(const struct mg_connection *conn)
 	}
 
 	return (mg_strcasecmp(conn->dom_ctx->config[DECODE_URL], "yes") == 0);
+}
+
+static int
+should_validate_http_method(const struct mg_connection *conn)
+{
+	if (!conn || !conn->ctx || !conn->ctx->config[VALIDATE_HTTP_METHOD]) {
+		return 1;
+	}
+
+	return (mg_strcasecmp(conn->ctx->config[VALIDATE_HTTP_METHOD], "yes") == 0);
 }
 
 
@@ -7190,10 +7209,14 @@ static int
 get_http_header_len(const char *buf, int buflen)
 {
 	int i;
+	int in_content = 0;
+
 	for (i = 0; i < buflen; i++) {
 		/* Do an unsigned comparison in some conditions below */
 		const unsigned char c = ((const unsigned char *)buf)[i];
 
+		if (in_content) {
+		} else
 		if ((c < 128) && ((char)c != '\r') && ((char)c != '\n')
 		    && !isprint(c)) {
 			/* abort scan as soon as one malformed character is found */
@@ -7216,6 +7239,13 @@ get_http_header_len(const char *buf, int buflen)
 				/* Two \r\n - standard compliant */
 				return i + 4;
 			}
+		}
+		if (in_content) {
+			if (buf[i] == '\n') {
+				in_content = 0;
+			}
+		} else if (buf[i] == ':') {
+			in_content = 1;
 		}
 	}
 
@@ -9652,7 +9682,10 @@ is_valid_http_method(const char *method)
  * buf and ri must be valid pointers (not NULL), len>0.
  * Returns <0 on error. */
 static int
-parse_http_request(char *buf, int len, struct mg_request_info *ri)
+parse_http_request(int check_method,
+		char *buf,
+		int len,
+		struct mg_request_info *ri)
 {
 	int request_length;
 	int init_skip = 0;
@@ -9701,6 +9734,8 @@ parse_http_request(char *buf, int len, struct mg_request_info *ri)
 	}
 
 	/* Check for a valid http method */
+	if (!check_method) {
+	} else
 	if (!is_valid_http_method(ri->request_method)) {
 		return -1;
 	}
@@ -12995,7 +13030,9 @@ handle_request(struct mg_connection *conn)
 
 	/* 1.4. clean URIs, so a path like allowed_dir/../forbidden_file is
 	 * not possible */
-	remove_double_dots_and_double_slashes((char *)ri->local_uri);
+	if (!mg_strcasecmp(conn->ctx->config[CANONICALIZE_URL_PATH], "yes")) {
+		remove_double_dots_and_double_slashes((char *)ri->local_uri);
+	}
 
 	/* step 1. completed, the url is known now */
 	uri_len = (int)strlen(ri->local_uri);
@@ -16096,11 +16133,14 @@ static int
 get_request(struct mg_connection *conn, char *ebuf, size_t ebuf_len, int *err)
 {
 	const char *cl;
+	int check_method = should_validate_http_method(conn);
+
 	if (!get_message(conn, ebuf, ebuf_len, err)) {
 		return 0;
 	}
 
-	if (parse_http_request(conn->buf, conn->buf_size, &conn->request_info)
+	if (parse_http_request(check_method,
+		conn->buf, conn->buf_size, &conn->request_info)
 	    <= 0) {
 		mg_snprintf(conn,
 		            NULL, /* No truncation check for ebuf */
