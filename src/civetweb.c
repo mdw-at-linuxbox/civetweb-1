@@ -16181,7 +16181,7 @@ get_request(struct mg_connection *conn, char *ebuf, size_t ebuf_len, int *err)
 			            ebuf_len,
 			            "%s",
 			            "Bad request");
-			*err = 411;
+			*err = 400;
 			return 0;
 		}
 		/* Publish the content length back to the request info. */
@@ -16243,7 +16243,7 @@ get_response(struct mg_connection *conn, char *ebuf, size_t ebuf_len, int *err)
 			            ebuf_len,
 			            "%s",
 			            "Bad request");
-			*err = 411;
+			*err = 400;
 			return 0;
 		}
 		/* Publish the content length back to the response info. */
