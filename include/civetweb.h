@@ -304,6 +304,8 @@ CIVETWEB_API int mg_modify_passwords_file(const char *passwords_file_name,
 /* Return information associated with the request. */
 CIVETWEB_API struct mg_request_info *mg_get_request_info(struct mg_connection *);
 
+CIVETWEB_API struct sockaddr *mg_get_local_addr(struct mg_connection *);
+
 
 /* Send data to the client.
    Return:
