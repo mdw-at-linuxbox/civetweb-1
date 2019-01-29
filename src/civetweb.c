@@ -16252,6 +16252,9 @@ worker_thread_run(struct worker_thread_args *thread_args)
 					conn->request_info.client_cert = 0;
 				}
 			}
+			else {
+				close_connection(conn);
+			}
 #endif
 		} else {
 			/* process HTTP connection */
